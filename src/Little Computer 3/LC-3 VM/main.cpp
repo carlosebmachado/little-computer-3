@@ -35,11 +35,11 @@ enum Op
 	JSR,	// jump to subroutine (also: JSRR - register)
 	AND,	// bitwise logical and
 	LDR,	// load base + offset
-	STR,
-	RTI,	// return from interrupt
+	STR,	// store base offset
+	RTI,	// return from interrupt ***
 	NOT,	// bitwise complement
 	LDI,	// load indirect
-	STI,
+	STI,	// store indirect
 	JMP,	// jump (also: RET - return from subroutine)
 	RES,
 	LEA,	// load effective address
@@ -79,7 +79,6 @@ uint16_t reg[NREG];
 
 
 // FUNCTIONS
-
 
 // Extends to 16 bits.
 uint16_t sext(uint16_t val, int bits)
@@ -280,9 +279,54 @@ void eval()
 			break;
 		}
 		case RTI:
+		{
+			std::cout << "privilege mode exception" << std::endl;
+			abort();
+			break;
+		}
+		case ST:
+		{
+			uint16_t sr = (instr >> 9) & 0x7;
+			uint16_t pcoffset9 = instr & 0x1FF;
+
+			mem[reg[PC] + sext(pcoffset9, 9)] = reg[sr];
+
+			break;
+		}
+		case STI:
+		{
+			uint16_t sr = (instr >> 9) & 0x7;
+			uint16_t pcoffset9 = instr & 0x1FF;
+
+			mem[mem[reg[PC] + sext(pcoffset9, 9)]] = reg[sr];
+
+			break;
+		}
+		case STR:
+		{
+			uint16_t sr = (instr >> 9) & 0x7;
+			uint16_t baser = (instr >> 6) & 0x7;
+			uint16_t pcoffset6 = instr & 0x3F;
+
+			mem[baser + sext(pcoffset6, 6)] = reg[sr];
+
+			break;
+		}
+		case TRAP:
+		{
+
+			break;
+		}
 		case RES:
+		{
+			std::cout << "RES bad opcode..." << std::endl;
+			abort();
+			break;
+		}
 		default:
 		{
+			std::cout << "unknown opcode..." << std::endl;
+			abort();
 			break;
 		}
 	}
