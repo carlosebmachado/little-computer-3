@@ -4,6 +4,7 @@
 #include <vector>
 #include <bitset>
 #include <sstream>
+#include <conio.h>
 #include "print.hpp"
 
 
@@ -41,20 +42,20 @@ enum Op
 	LDI,	// load indirect
 	STI,	// store indirect
 	JMP,	// jump (also: RET - return from subroutine)
-	RES,
+	RES,	// unused opcode (reserved)
 	LEA,	// load effective address
-	TRAP
+	TRAP	// system call
 };
 
 // Trap operation codes.
 enum Trap
 {
-	GETC  = 0x20,
-	OUT   = 0x21,
-	PUTS  = 0x22,
-	IN    = 0x23,
-	PUTSP = 0x24,
-	HALT  = 0x25
+	GETC	= 0x20, // get char
+	OUT		= 0x21, // out char
+	PUTS	= 0x22, // put string
+	IN		= 0x23, // prompt in
+	PUTSP	= 0x24, // put string double
+	HALT	= 0x25
 };
 
 // Condition codes.
@@ -314,6 +315,62 @@ void eval()
 		}
 		case TRAP:
 		{
+			uint16_t trapvect8 = instr & 0xFF;
+
+			switch (trapvect8)
+			{
+				case GETC:
+				{
+					reg[R0] = (uint16_t)_getch();
+					break;
+				}
+				case OUT:
+				{
+					_putch(reg[R0]);
+					break;
+				}
+				case PUTS:
+				{
+					uint16_t loc = reg[R0];
+					while (mem[loc])
+					{
+						_putch(mem[loc]);
+						loc++;
+					}
+					break;
+				}
+				case IN:
+				{
+					std::cout << "$>";
+					reg[R0] = (uint16_t)_getch();
+					break;
+				}
+				case PUTSP:
+				{
+					uint16_t loc = reg[R0];
+					while (mem[loc])
+					{
+						_putch(mem[loc] & 0xFF);
+						char c = mem[loc] >> 8;
+						if (c)
+						{
+							_putch(c);
+						}
+						loc++;
+					}
+					break;
+				}
+				case HALT:
+				{
+					std::cout << "HALT" << std::endl;
+					running = 0;
+					break;
+				}
+				default:
+				{
+					break;
+				}
+			}
 
 			break;
 		}
@@ -332,21 +389,18 @@ void eval()
 	}
 }
 
+uint16_t swap16(uint16_t val)
+{
+	return (val >> 8) | (val << 8);
+}
+
 // Load the program file and put it on memory.
 bool load(const char* path)
 {
 	std::ifstream is;
 	std::vector<uint16_t> rawFileBuffer;
 
-	// debug file
-	//hxe::println(path);
-	std::stringstream np;
-	np << path;
-	np << "add_pos.obj";
-	is.open(np.str().c_str(), std::ios::binary);
-	//hxe::println(np.str().c_str());
-	// ---------
-	//is.open(path, std::ios::binary);
+	is.open(path, std::ios::binary);
 
 	if (!is.is_open())
 	{
@@ -362,16 +416,16 @@ bool load(const char* path)
 
 	is.read((char*)rawFileBuffer.data(), filesize);
 
-	//hxe::println("File:");
-	//for (size_t i = 0; i < rawFileBuffer.size(); i++) {
-	//    if (rawFileBuffer[i] > 0) {
-	//        hxe::print("Pos ");
-	//        hxe::printHex(i);
-	//        hxe::printHex(rawFileBuffer[i]);
-	//    }
-	//}
+	hxe::println("File:");
+	for (size_t i = 0; i < rawFileBuffer.size(); i++) {
+		std::stringstream ns;
+		ns << "Pos " << i+1 << "\n";
+		hxe::print(ns.str().c_str());
+		hxe::printBin(rawFileBuffer[i]);
+		hxe::printBin(swap16(rawFileBuffer[i]));
+	}
 
-	uint16_t iaddr = (rawFileBuffer[0] >> 8) | (rawFileBuffer[0] << 8);
+	uint16_t iaddr = swap16(rawFileBuffer[0]);
 	if (iaddr < 0x3000)
 	{
 		std::cout << "initial address should be equal or greather than 0x3000" << std::endl;
@@ -384,7 +438,7 @@ bool load(const char* path)
 	for (size_t i = 1; i < rawFileBuffer.size(); i++)
 	{
 		// swap bytes
-		mem[memi] = (rawFileBuffer[i] >> 8) | (rawFileBuffer[i] << 8);
+		mem[memi] = swap16(rawFileBuffer[i]);
 		memi++;
 		if(memi > 0xFDFF)
 		{
@@ -393,12 +447,12 @@ bool load(const char* path)
 		}
 	}
 
-	//hxe::println("Memory swaped:");
+	//hxe::println("\nMemory swaped:");
 	//for (uint16_t i = 0; i < UINT16_MAX; i++) {
-	//    if (memory[i] > 0) {
+	//    if (mem[i] > 0) {
 	//        hxe::print("Pos ");
 	//        hxe::printHex(i);
-	//        hxe::printHex(memory[i]);
+	//        hxe::printBin(mem[i]);
 	//    }
 	//}
 
@@ -424,8 +478,7 @@ int main(int argc, const char* argv[])
 		}
 	}
 
-	// TODO: inicializar variáveis
-
+	// loop principal
 	while (running)
 	{
 		eval();
