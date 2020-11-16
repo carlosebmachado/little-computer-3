@@ -5,7 +5,21 @@
 #include <bitset>
 #include <sstream>
 #include <conio.h>
+
+// debug
 #include "print.hpp"
+#include "debug_program.h"
+
+
+// DEFINES
+#define OFFSET1  0b1
+#define OFFSET3  0b111
+#define OFFSET5  0b11111
+#define OFFSET6  0b111111
+#define OFFSET7  0b1111111
+#define OFFSET8  0b11111111
+#define OFFSET9  0b111111111
+#define OFFSET11 0b11111111111
 
 
 // ENUMS
@@ -85,7 +99,7 @@ uint16_t reg[NREG];
 uint16_t sext(uint16_t val, int bits)
 {
 	// se o bit mais à esquerda for 1 é negativo
-	if ((val >> bits - 1) & 1)
+	if ((val >> bits - 1) & 0b1)
 	{
 		// extende os bits à esquerda
 		val |= 0xFFFF << bits;
@@ -95,7 +109,7 @@ uint16_t sext(uint16_t val, int bits)
 
 void setcc(uint16_t val)
 {
-	if ((val >> 15) & 1)
+	if ((val >> 15) & 0b1)
 	{
 		// negativo
 		reg[CC] = N;
@@ -129,22 +143,18 @@ void eval()
 	{
 		case ADD:
 		{
-			// dest reg
-			uint16_t dr = (instr >> 9) & 0x7;
-			// source reg 1
-			uint16_t sr1 = (instr >> 6) & 0x7;
+			uint16_t dr = (instr >> 9) & 0b111;
+			uint16_t sr1 = (instr >> 6) & 0b111;
+			uint16_t bit5 = (instr >> 5) & 0b1;
 
-			// verifica se o bit 5 é 0
-			if (!((instr >> 5) & 0x1))
+			if (!bit5)
 			{
-				// se for sr1 é somado com sr2
-				uint16_t sr2 = instr & 0x7;
+				uint16_t sr2 = instr & 0b111;
 				reg[dr] = reg[sr1] + reg[sr2];
 			}
 			else
 			{
-				// senão é somado com o immediate 5 bits
-				uint16_t imm5 = instr & 0x1F;
+				uint16_t imm5 = instr & 0b11111;
 				reg[dr] = reg[sr1] + sext(imm5, 5);
 			}
 
@@ -154,18 +164,18 @@ void eval()
 		}
 		case AND:
 		{
-			uint16_t dr = (instr >> 9) & 0x7;
-			uint16_t sr1 = (instr >> 6) & 0x7;
+			uint16_t dr = (instr >> 9) & 0b111;
+			uint16_t sr1 = (instr >> 6) & 0b111;
+			uint16_t bit5 = (instr >> 5) & 0b1;
 
-			// verifica se o bit 5 é 0
-			if (!((instr >> 5) & 0x1))
+			if (!bit5)
 			{
-				uint16_t sr2 = instr & 0x7;
+				uint16_t sr2 = instr & 0b111;
 				reg[dr] = reg[sr1] & reg[sr2];
 			}
 			else
 			{
-				uint16_t imm5 = instr & 0x1F;
+				uint16_t imm5 = instr & 0b11111;
 				reg[dr] = reg[sr1] & sext(imm5, 5);
 			}
 
@@ -175,18 +185,13 @@ void eval()
 		}
 		case BR:
 		{
-			uint16_t n = (instr >> 11) & 0x1;
-			uint16_t z = (instr >> 10) & 0x1;
-			uint16_t p = (instr >>  9) & 0x1;
-			uint16_t pcoffset9 = instr & 0x1FF;
+			uint16_t nzp = (instr >> 9) & 0b111;
+			uint16_t pcoffset9 = instr & 0b111111111;
 
-			// verifica se alguma flag foi recebida
-			// e se foi, se ela está ativa no registrador
-			if ((n & ((reg[CC] >> 2) & 0x1)) ||
-				(z & ((reg[CC] >> 1) & 0x1)) ||
-				(p & ((reg[CC] >> 0) & 0x1)))
+			uint16_t NZP = reg[CC] & 0b111;
+
+			if (nzp & NZP)
 			{
-				// caso alguma se verdade é atribuido pcoffset 9 bits ao PC
 				reg[PC] += sext(pcoffset9, 9);
 			}
 			
@@ -194,9 +199,7 @@ void eval()
 		}
 		case JMP:
 		{
-			// faz um pulo incondicional atravez do reg lido
-			// ou faz o retorno da função, onde é atribuido o reg 7
-			uint16_t baser = (instr >> 6) & 0x7;
+			uint16_t baser = (instr >> 6) & 0b111;
 
 			reg[PC] = reg[baser];
 			
@@ -204,20 +207,18 @@ void eval()
 		}
 		case JSR:
 		{
-			// salva estado do PC em R7
 			reg[R7] = reg[PC];
 
-			// verifica se o bit 11 é 0
-			if (!((instr >> 11) & 0x1))
+			uint16_t bit11 = (instr >> 11) & 0b1;
+
+			if (!bit11)
 			{
-				// se for ele atribui para PC o valor do registrador base
-				uint16_t baser = (instr >> 6) & 0x7;
+				uint16_t baser = (instr >> 6) & 0b111;
 				reg[PC] = reg[baser];
 			}
 			else
 			{
-				// senão ele atribui o offset extendido
-				uint16_t pcoffset11 = instr & 0x7FF;
+				uint16_t pcoffset11 = instr & 0b11111111111;
 				reg[PC] += sext(pcoffset11, 11);
 			}
 
@@ -225,8 +226,8 @@ void eval()
 		}
 		case LD:
 		{
-			uint16_t dr = (instr >> 9) & 0x7;
-			uint16_t pcoffset9 = instr & 0x1FF;
+			uint16_t dr = (instr >> 9) & 0b111;
+			uint16_t pcoffset9 = instr & 0b111111111;
 
 			reg[dr] = mem[reg[PC] + sext(pcoffset9, 9)];
 
@@ -236,10 +237,12 @@ void eval()
 		}
 		case LDI:
 		{
-			uint16_t dr = (instr >> 9) & 0x7;
-			uint16_t pcoffset9 = instr & 0x1FF;
+			uint16_t dr = (instr >> 9) & 0b111;
+			uint16_t pcoffset9 = instr & 0b111111111;
 
-			reg[dr] = mem[mem[reg[PC] + sext(pcoffset9, 9)]];
+			uint16_t pos = reg[PC] + sext(pcoffset9, 9);
+
+			reg[dr] = mem[mem[pos]];
 
 			setcc(reg[dr]);
 
@@ -247,11 +250,13 @@ void eval()
 		}
 		case LDR:
 		{
-			uint16_t dr = (instr >> 9) & 0x7;
-			uint16_t baser = (instr >> 6) & 0x7;
-			uint16_t pcoffset6 = instr & 0x3F;
+			uint16_t dr = (instr >> 9) & 0b111;
+			uint16_t baser = (instr >> 6) & 0b111;
+			uint16_t pcoffset6 = instr & 0b111111;
 
-			reg[dr] = mem[reg[baser] + sext(pcoffset6, 6)];
+			uint16_t pos = reg[baser] + sext(pcoffset6, 6);
+
+			reg[dr] = mem[pos];
 
 			setcc(reg[dr]);
 
@@ -259,8 +264,8 @@ void eval()
 		}
 		case LEA:
 		{
-			uint16_t dr = (instr >> 9) & 0x7;
-			uint16_t pcoffset9 = instr & 0x1FF;
+			uint16_t dr = (instr >> 9) & 0b111;
+			uint16_t pcoffset9 = instr & 0b111111111;
 
 			reg[dr] = reg[PC] + sext(pcoffset9, 9);
 
@@ -270,8 +275,8 @@ void eval()
 		}
 		case NOT:
 		{
-			uint16_t dr = (instr >> 9) & 0x7;
-			uint16_t sr = (instr >> 6) & 0x7;
+			uint16_t dr = (instr >> 9) & 0b111;
+			uint16_t sr = (instr >> 6) & 0b111;
 
 			reg[dr] = ~reg[sr];
 
@@ -287,35 +292,41 @@ void eval()
 		}
 		case ST:
 		{
-			uint16_t sr = (instr >> 9) & 0x7;
-			uint16_t pcoffset9 = instr & 0x1FF;
+			uint16_t sr = (instr >> 9) & 0b111;
+			uint16_t pcoffset9 = instr & 0b111111111;
 
-			mem[reg[PC] + sext(pcoffset9, 9)] = reg[sr];
+			uint16_t pos = reg[PC] + sext(pcoffset9, 9);
+
+			mem[pos] = reg[sr];
 
 			break;
 		}
 		case STI:
 		{
-			uint16_t sr = (instr >> 9) & 0x7;
-			uint16_t pcoffset9 = instr & 0x1FF;
+			uint16_t sr = (instr >> 9) & 0b111;
+			uint16_t pcoffset9 = instr & 0b111111111;
 
-			mem[mem[reg[PC] + sext(pcoffset9, 9)]] = reg[sr];
+			uint16_t pos = reg[PC] + sext(pcoffset9, 9);
+
+			mem[mem[pos]] = reg[sr];
 
 			break;
 		}
 		case STR:
 		{
-			uint16_t sr = (instr >> 9) & 0x7;
-			uint16_t baser = (instr >> 6) & 0x7;
-			uint16_t pcoffset6 = instr & 0x3F;
+			uint16_t sr = (instr >> 9) & 0b111;
+			uint16_t baser = (instr >> 6) & 0b111;
+			uint16_t pcoffset6 = instr & 0b111111;
 
-			mem[baser + sext(pcoffset6, 6)] = reg[sr];
+			uint16_t pos = reg[baser] + sext(pcoffset6, 6);
+
+			mem[pos] = reg[sr];
 
 			break;
 		}
 		case TRAP:
 		{
-			uint16_t trapvect8 = instr & 0xFF;
+			uint16_t trapvect8 = instr & 0b11111111;
 
 			switch (trapvect8)
 			{
@@ -331,32 +342,34 @@ void eval()
 				}
 				case PUTS:
 				{
-					uint16_t loc = reg[R0];
-					while (mem[loc])
+					uint16_t pos = reg[R0];
+					while (mem[pos])
 					{
-						_putch(mem[loc]);
-						loc++;
+						_putch(mem[pos]);
+						pos++;
 					}
 					break;
 				}
 				case IN:
 				{
 					std::cout << "$>";
-					reg[R0] = (uint16_t)_getch();
+					uint16_t c = (uint16_t)_getch();
+					std::cout << (char)c << std::endl;
+					reg[R0] = c;
 					break;
 				}
 				case PUTSP:
 				{
-					uint16_t loc = reg[R0];
-					while (mem[loc])
+					uint16_t pos = reg[R0];
+					while (mem[pos])
 					{
-						_putch(mem[loc] & 0xFF);
-						char c = mem[loc] >> 8;
+						_putch(mem[pos] & 0b11111111);
+						char c = mem[pos] >> 8;
 						if (c)
 						{
 							_putch(c);
 						}
-						loc++;
+						pos++;
 					}
 					break;
 				}
@@ -416,21 +429,31 @@ bool load(const char* path)
 
 	is.read((char*)rawFileBuffer.data(), filesize);
 
-	hxe::println("File:");
-	for (size_t i = 0; i < rawFileBuffer.size(); i++) {
-		std::stringstream ns;
-		ns << "Pos " << i+1 << "\n";
-		hxe::print(ns.str().c_str());
-		hxe::printBin(rawFileBuffer[i]);
-		hxe::printBin(swap16(rawFileBuffer[i]));
-	}
+	//hxe::println("File:");
+	//for (size_t i = 0; i < rawFileBuffer.size(); i++) {
+	//	std::stringstream ns;
+	//	ns << "Pos " << i+1 << "\n";
+	//	hxe::print(ns.str().c_str());
+	//	hxe::printBin(rawFileBuffer[i]);
+	//	hxe::printBin(swap16(rawFileBuffer[i]));
+	//}
+
+
+	// debug program
+	//rawFileBuffer = std::vector<uint16_t>();
+	//int size = sizeof(debug_program) / sizeof(debug_program[0]);
+	//for (int i = 1; i < size; i++) {
+	//	rawFileBuffer.push_back(debug_program[i]);
+	//}
+	// -------------------------
+
 
 	uint16_t iaddr = swap16(rawFileBuffer[0]);
-	if (iaddr < 0x3000)
-	{
-		std::cout << "initial address should be equal or greather than 0x3000" << std::endl;
-		return false;
-	}
+	//if (iaddr < 0x3000)
+	//{
+	//	std::cout << "initial address should be equal or greather than 0x3000" << std::endl;
+	//	return false;
+	//}
 	// atribui o endereço inicial ao pc
 	reg[PC] = iaddr;
 	// faz o swap dos bytes e carrega o programa para a memória
