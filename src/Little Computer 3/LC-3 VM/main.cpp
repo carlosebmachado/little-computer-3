@@ -4,6 +4,7 @@
 #include <vector>
 #include <bitset>
 #include <sstream>
+#include <Windows.h>
 #include <conio.h>
 
 // debug
@@ -12,6 +13,13 @@
 
 
 // DEFINES
+#ifdef OUT
+#undef OUT
+#endif // OUT
+#ifdef IN
+#undef IN
+#endif // IN
+
 #define OFFSET1  0b1
 #define OFFSET3  0b111
 #define OFFSET5  0b11111
@@ -80,6 +88,13 @@ enum CC
 	N = 1 << 2
 };
 
+// Memory mapped registers.
+enum MR
+{
+	KBSR = 0xFE00, // keyboard status
+	KBDR = 0xFE02  // keyboard data
+};
+
 
 // GLOBAL VARS
 
@@ -92,6 +107,9 @@ uint16_t mem[UINT16_MAX];
 // Vetor de posições dos registradores.
 uint16_t reg[NREG];
 
+// 
+HANDLE hStdin = INVALID_HANDLE_VALUE;
+
 
 // FUNCTIONS
 
@@ -99,7 +117,7 @@ uint16_t reg[NREG];
 uint16_t sext(uint16_t val, int bits)
 {
 	// se o bit mais à esquerda for 1 é negativo
-	if ((val >> bits - 1) & 0b1)
+	if ((val >> (bits - 1)) & 0b1)
 	{
 		// extende os bits à esquerda
 		val |= 0xFFFF << bits;
@@ -126,9 +144,36 @@ void setcc(uint16_t val)
 	}
 }
 
+//void kbcheck(uint16_t address)
+//{
+//	if (address == KBSR)
+//	{
+//		if (WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0 && _kbhit())
+//		{
+//			mem[KBSR] = (1 << 15);
+//			mem[KBDR] = getchar();
+//		}
+//		else
+//		{
+//			mem[KBSR] = 0;
+//		}
+//	}
+//}
+
 // It fetch and evaluate the instruction.
 void eval()
 {
+	//if (_kbhit())
+	//{
+	//	mem[KBSR] = (1 << 15);
+	//	mem[KBDR] = _getch();
+	//}
+	//else
+	//{
+	//	mem[KBSR] = 0;
+	//}
+	//FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
+
 	// fetch
 	uint16_t instr = mem[reg[PC]++];
 	uint16_t op = instr >> 12;
@@ -229,7 +274,9 @@ void eval()
 			uint16_t dr = (instr >> 9) & 0b111;
 			uint16_t pcoffset9 = instr & 0b111111111;
 
-			reg[dr] = mem[reg[PC] + sext(pcoffset9, 9)];
+			uint16_t pos = reg[PC] + sext(pcoffset9, 9);
+
+			reg[dr] = mem[pos];
 
 			setcc(reg[dr]);
 
@@ -442,7 +489,7 @@ bool load(const char* path)
 	// debug program
 	//rawFileBuffer = std::vector<uint16_t>();
 	//int size = sizeof(debug_program) / sizeof(debug_program[0]);
-	//for (int i = 1; i < size; i++) {
+	//for (int i = 0; i < size; i++) {
 	//	rawFileBuffer.push_back(debug_program[i]);
 	//}
 	// -------------------------

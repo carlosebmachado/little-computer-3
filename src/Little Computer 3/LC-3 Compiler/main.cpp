@@ -67,8 +67,8 @@ enum
 
 enum
 {
-    MR_KBSR = 0xFE00, // keyboard status
-    MR_KBDR = 0xFE02  // keyboard data
+    KBSR = 0xFE00, // keyboard status
+    KBDR = 0xFE02  // keyboard data
 };
 
 
