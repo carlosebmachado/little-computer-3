@@ -6,6 +6,8 @@
 #include <sstream>
 #include <Windows.h>
 #include <conio.h>
+#include <thread>
+#include <list>
 
 // debug
 #include "print.hpp"
@@ -144,48 +146,40 @@ void setcc(uint16_t val)
 	}
 }
 
-//void kbcheck(uint16_t address)
-//{
-//	if (address == KBSR)
-//	{
-//		if (WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0 && _kbhit())
-//		{
-//			mem[KBSR] = (1 << 15);
-//			mem[KBDR] = getchar();
-//		}
-//		else
-//		{
-//			mem[KBSR] = 0;
-//		}
-//	}
-//}
+void kbread()
+{
+	while (true)
+	{
+		if (_kbhit())
+		{
+			mem[KBSR] = (1 << 15);
+			mem[KBDR] = _getch();
+		}
+		else
+		{
+			mem[KBSR] = 0;
+		}
+		FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
+	}
+}
 
 // It fetch and evaluate the instruction.
 void eval()
 {
-	//if (_kbhit())
-	//{
-	//	mem[KBSR] = (1 << 15);
-	//	mem[KBDR] = _getch();
-	//}
-	//else
-	//{
-	//	mem[KBSR] = 0;
-	//}
-	//FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
-
-	// fetch
-	uint16_t instr = mem[reg[PC]++];
-	uint16_t op = instr >> 12;
-
-	//hxe::printHex(instruction);
-	//hxe::printHex(op);
-	//if (instruction == 0) {
-	//    running = false;
-	//}
-
-	switch (op)
+	while (running)
 	{
+		// fetch
+		uint16_t instr = mem[reg[PC]++];
+		uint16_t op = instr >> 12;
+
+		//hxe::printHex(instruction);
+		//hxe::printHex(op);
+		//if (instruction == 0) {
+		//    running = false;
+		//}
+
+		switch (op)
+		{
 		case ADD:
 		{
 			uint16_t dr = (instr >> 9) & 0b111;
@@ -239,7 +233,7 @@ void eval()
 			{
 				reg[PC] += sext(pcoffset9, 9);
 			}
-			
+
 			break;
 		}
 		case JMP:
@@ -247,7 +241,7 @@ void eval()
 			uint16_t baser = (instr >> 6) & 0b111;
 
 			reg[PC] = reg[baser];
-			
+
 			break;
 		}
 		case JSR:
@@ -377,59 +371,59 @@ void eval()
 
 			switch (trapvect8)
 			{
-				case GETC:
+			case GETC:
+			{
+				reg[R0] = (uint16_t)_getch();
+				break;
+			}
+			case OUT:
+			{
+				_putch(reg[R0]);
+				break;
+			}
+			case PUTS:
+			{
+				uint16_t pos = reg[R0];
+				while (mem[pos])
 				{
-					reg[R0] = (uint16_t)_getch();
-					break;
+					_putch(mem[pos]);
+					pos++;
 				}
-				case OUT:
+				break;
+			}
+			case IN:
+			{
+				std::cout << "$>";
+				uint16_t c = (uint16_t)_getch();
+				std::cout << (char)c << std::endl;
+				reg[R0] = c;
+				break;
+			}
+			case PUTSP:
+			{
+				uint16_t pos = reg[R0];
+				while (mem[pos])
 				{
-					_putch(reg[R0]);
-					break;
-				}
-				case PUTS:
-				{
-					uint16_t pos = reg[R0];
-					while (mem[pos])
+					_putch(mem[pos] & 0b11111111);
+					char c = mem[pos] >> 8;
+					if (c)
 					{
-						_putch(mem[pos]);
-						pos++;
+						_putch(c);
 					}
-					break;
+					pos++;
 				}
-				case IN:
-				{
-					std::cout << "$>";
-					uint16_t c = (uint16_t)_getch();
-					std::cout << (char)c << std::endl;
-					reg[R0] = c;
-					break;
-				}
-				case PUTSP:
-				{
-					uint16_t pos = reg[R0];
-					while (mem[pos])
-					{
-						_putch(mem[pos] & 0b11111111);
-						char c = mem[pos] >> 8;
-						if (c)
-						{
-							_putch(c);
-						}
-						pos++;
-					}
-					break;
-				}
-				case HALT:
-				{
-					std::cout << "HALT" << std::endl;
-					running = 0;
-					break;
-				}
-				default:
-				{
-					break;
-				}
+				break;
+			}
+			case HALT:
+			{
+				std::cout << "HALT" << std::endl;
+				running = 0;
+				break;
+			}
+			default:
+			{
+				break;
+			}
 			}
 
 			break;
@@ -445,6 +439,7 @@ void eval()
 			std::cout << "unknown opcode..." << std::endl;
 			abort();
 			break;
+		}
 		}
 	}
 }
@@ -548,10 +543,13 @@ int main(int argc, const char* argv[])
 		}
 	}
 
-	// loop principal
-	while (running)
+	std::list<std::thread> threads;
+	threads.push_back(std::thread(kbread));
+	threads.push_back(std::thread(eval));
+
+	for (auto& thread :threads)
 	{
-		eval();
+		thread.join();
 	}
 
 	return EXIT_SUCCESS;
