@@ -1,2 +1,2 @@
-# little-computer-3
- 
+# Little Computer 3 Virtual Machine
+
