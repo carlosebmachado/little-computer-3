@@ -148,7 +148,7 @@ void setcc(uint16_t val)
 
 void kbread()
 {
-	while (true)
+	while (running)
 	{
 		if (_kbhit())
 		{
@@ -542,6 +542,8 @@ int main(int argc, const char* argv[])
 			return EXIT_FAILURE;
 		}
 	}
+
+	FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
 
 	std::list<std::thread> threads;
 	threads.push_back(std::thread(kbread));
