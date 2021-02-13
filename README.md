@@ -9,4 +9,4 @@ This Virtual Machine (VM) can run Little Computer 3 (LC-3) programs. You can wri
 You can download the LC-3 on release section.
 
 ### Getting Started
-To run the LC-3 use the command ```lc3 "program path"```.
+You can run the LC-3 by command line using the command ```lc3 "LC-3 program path"``` on program folder.
