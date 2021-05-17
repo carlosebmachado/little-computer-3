@@ -5,7 +5,7 @@ This Virtual Machine (VM) can run Little Computer 3 (LC-3) programs. You can wri
 
 ## Example
 ### Running a LC-3 version of 2048
-![Game 2048](img/playing2048.png)
+![Game 2048](docs/img/playing2048.png)
 
 ## Usage
 
